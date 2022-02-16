@@ -19,10 +19,10 @@
 /* USER CODE END Header */
 /* Includes ------------------------------------------------------------------*/
 #include "main.h"
+#include "defines.h"
 #include <stdio.h>
 /* Private includes ----------------------------------------------------------*/
 /* USER CODE BEGIN Includes */
-#include "bmi2.h"
 #include "bmi270.h"
 /* USER CODE END Includes */
 
@@ -56,6 +56,7 @@ PCD_HandleTypeDef hpcd_USB_OTG_FS;
 
 /* USER CODE BEGIN PV */
 struct bmi2_dev bmi2;
+struct bmi2_feat_sensor_data sensor_data = {.type = BMI2_STEP_COUNTER};
 /* USER CODE END PV */
 
 /* Private function prototypes -----------------------------------------------*/
@@ -86,16 +87,12 @@ HAL_StatusTypeDef BMI270_read_i2c(uint8_t dev_addr, uint8_t reg_addr,
 	 reg_data: Data to be written.
 	 count: Number of bytes to write */
 	// Begin I2C communication with provided I2C address
-	Wire.beginTransmission(dev_addr);
-	Wire.write(reg_addr);
-	// Done writting, end the transmission
-	int8_t returned = Wire.endTransmission();
 
-	HAL_StatusTypeDef returned = HAL_I2C_Mem_Read(&hi2c1, dev_addr, reg_addr,
+	HAL_StatusTypeDef result = HAL_I2C_Mem_Read(&hi2c1, dev_addr, reg_addr,
 			I2C_MEMADD_SIZE_8BIT, reg_data, count, HAL_MAX_DELAY);
 
 
-	return 0;
+	return result;
 }
 
 HAL_StatusTypeDef BMI270_write_i2c(uint8_t dev_addr, uint8_t reg_addr,
@@ -105,6 +102,54 @@ HAL_StatusTypeDef BMI270_write_i2c(uint8_t dev_addr, uint8_t reg_addr,
 	I2C_MEMADD_SIZE_8BIT, reg_data, count, HAL_MAX_DELAY);
 
 	return returned;
+}
+
+int8_t bmi2_step_counter_set_config(struct bmi2_dev *bmi2_dev)
+{
+  /* Variable to define result */
+  int8_t rslt;
+
+  /* Initialize interrupts for gyroscope */
+  struct bmi2_sens_int_config sens_int = { .type = BMI2_STEP_COUNTER, .hw_int_pin = BMI2_INT2 };
+
+  /* List the sensors which are required to enable */
+  uint8_t sens_list[2] = {BMI2_ACCEL, BMI2_STEP_COUNTER};
+
+  /* Structure to define the type of the sensor and its configurations */
+  struct bmi2_sens_config config;
+
+  /* Configure type of feature */
+  config.type = BMI2_STEP_COUNTER;
+
+  /* Enable the selected sensors */
+  rslt = bmi2_sensor_enable(sens_list, 2, bmi2_dev);
+
+  if (rslt == BMI2_OK)
+  {
+    /* Get default configurations for the type of feature selected */
+    rslt = bmi2_get_sensor_config(&config, 1, bmi2_dev);
+
+    if (rslt == BMI2_OK)
+    {
+      config.cfg.step_counter.watermark_level = 1;
+
+      rslt = bmi2_set_sensor_config(&config, 1, bmi2_dev);
+      if (rslt == BMI2_OK) {
+        /* Map interrupt to pins */
+    	  rslt = bmi270_map_feat_int(&sens_int, 1, bmi2_dev);
+      } else {
+        printf("Set Sensor Config failed");
+      }
+
+
+    } else {
+      printf("Get sensor config failed");
+    }
+  } else {
+    printf("Sensor Enable Failed");
+  }
+
+  return rslt;
 }
 
 /* USER CODE END 0 */
@@ -144,6 +189,22 @@ int main(void) {
 	MX_USB_OTG_FS_PCD_Init();
 	MX_I2C1_Init();
 	/* USER CODE BEGIN 2 */
+
+	uint8_t i2c_bus = 0x68;
+	bmi2.intf_ptr = &i2c_bus;
+	bmi2.intf = BMI2_I2C_INTF;
+	bmi2.read = BMI270_read_i2c;
+	bmi2.write = BMI270_write_i2c;
+	bmi2.read_write_len = 30;
+	bmi2.delay_us = Delay;
+
+	bmi2.config_file_ptr = NULL;
+	int8_t rslt = bmi270_init(&bmi2);
+
+	if(rslt == BMI2_OK){
+		printf("BMI 270 Complete");
+	}
+
 	/* USER CODE END 2 */
 
 	/* Infinite loop */
