@@ -79,41 +79,30 @@ int __io_putchar(int ch) {
 	return ch;
 }
 
-HAL_Status BMI270_read_i2c(uint8_t dev_addr, uint8_t reg_addr, uint8_t *reg_data, uint16_t count)
-{
-  /* dev_addr: I2C device address.
-    reg_addr: Starting address for writing the data.
-    reg_data: Data to be written.
-    count: Number of bytes to write */
-  // Begin I2C communication with provided I2C address
-  Wire.beginTransmission(dev_addr);
-  Wire.write(reg_addr);
-  // Done writting, end the transmission
-  int8_t returned = Wire.endTransmission();
+HAL_StatusTypeDef BMI270_read_i2c(uint8_t dev_addr, uint8_t reg_addr,
+		uint8_t *reg_data, uint16_t count) {
+	/* dev_addr: I2C device address.
+	 reg_addr: Starting address for writing the data.
+	 reg_data: Data to be written.
+	 count: Number of bytes to write */
+	// Begin I2C communication with provided I2C address
+	Wire.beginTransmission(dev_addr);
+	Wire.write(reg_addr);
+	// Done writting, end the transmission
+	int8_t returned = Wire.endTransmission();
+
+	HAL_StatusTypeDef returned = HAL_I2C_Mem_Read(&hi2c1, dev_addr, reg_addr,
+			I2C_MEMADD_SIZE_8BIT, reg_data, count, HAL_MAX_DELAY);
 
 
-
-  // Requests the required number of bytes from the sensor
-  Wire.requestFrom((int)dev_addr, (int)count);
-
-  uint16_t i;
-  // Reads the requested number of bytes into the provided array
-  for (i = 0; (i < count) && Wire.available(); i++)
-  {
-    reg_data[i] = Wire.read(); // This is for the modern Wire library
-  }
-
-  // This must return 0 on success, any other value will be interpreted as a communication failure.
-  return 0;
+	return 0;
 }
 
 HAL_StatusTypeDef BMI270_write_i2c(uint8_t dev_addr, uint8_t reg_addr,
 		uint8_t *reg_data, uint16_t count) {
 
-
 	HAL_StatusTypeDef returned = HAL_I2C_Mem_Write(&hi2c1, dev_addr, reg_addr,
-			I2C_MEMADD_SIZE_8BIT, reg_data, count, HAL_MAX_DELAY);
-
+	I2C_MEMADD_SIZE_8BIT, reg_data, count, HAL_MAX_DELAY);
 
 	return returned;
 }
