@@ -50,8 +50,9 @@ I2C_HandleTypeDef hi2c1;
 UART_HandleTypeDef huart1;
 
 /* USER CODE BEGIN PV */
-struct bmi2_dev bmi2;
-struct bmi2_feat_sensor_data sensor_data = {.type = BMI2_STEP_COUNTER};
+struct bmi2_dev bmi270dev;
+struct bmi2_feat_sensor_data sensor_data = { .type = BMI2_STEP_COUNTER };
+
 uint8_t bmi270_dev_addr;
 /* USER CODE END PV */
 
@@ -60,6 +61,8 @@ void SystemClock_Config(void);
 static void MX_GPIO_Init(void);
 static void MX_USART1_UART_Init(void);
 static void MX_I2C1_Init(void);
+int8_t SensorAPI_I2Cx_Read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr);
+int8_t SensorAPI_I2Cx_Write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr);
 /* USER CODE BEGIN PFP */
 
 /* USER CODE END PFP */
@@ -71,218 +74,222 @@ int __io_putchar(int ch) {
 	return ch;
 }
 
-void bmi2_error_codes_print_result(int8_t rslt)
-{
-    switch (rslt)
-    {
-        case BMI2_OK:
+void bmi2_error_codes_print_result(int8_t rslt) {
+	switch (rslt) {
+	case BMI2_OK:
 
-            /* Do nothing */
-            break;
+		/* Do nothing */
+		break;
 
-        case BMI2_W_FIFO_EMPTY:
-            PDEBUG("Warning [%d] : FIFO empty\r\n", rslt);
-            break;
-        case BMI2_W_PARTIAL_READ:
-            PDEBUG("Warning [%d] : FIFO partial read\r\n", rslt);
-            break;
-        case BMI2_E_NULL_PTR:
-            PDEBUG(
-                "Error [%d] : Null pointer error. It occurs when the user tries to assign value (not address) to a pointer," " which has been initialized to NULL.\r\n",
-                rslt);
-            break;
+	case BMI2_W_FIFO_EMPTY:
+		PDEBUG("Warning [%d] : FIFO empty\r\n", rslt);
+		break;
+	case BMI2_W_PARTIAL_READ:
+		PDEBUG("Warning [%d] : FIFO partial read\r\n", rslt);
+		break;
+	case BMI2_E_NULL_PTR:
+		PDEBUG(
+				"Error [%d] : Null pointer error. It occurs when the user tries to assign value (not address) to a pointer," " which has been initialized to NULL.\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_COM_FAIL:
-            PDEBUG(
-                "Error [%d] : Communication failure error. It occurs due to read/write operation failure and also due " "to power failure during communication\r\n",
-                rslt);
-            break;
+	case BMI2_E_COM_FAIL:
+		PDEBUG(
+				"Error [%d] : Communication failure error. It occurs due to read/write operation failure and also due " "to power failure during communication\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_DEV_NOT_FOUND:
-            PDEBUG("Error [%d] : Device not found error. It occurs when the device chip id is incorrectly read\r\n",
-                   rslt);
-            break;
+	case BMI2_E_DEV_NOT_FOUND:
+		PDEBUG(
+				"Error [%d] : Device not found error. It occurs when the device chip id is incorrectly read\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_INVALID_SENSOR:
-            PDEBUG(
-                "Error [%d] : Invalid sensor error. It occurs when there is a mismatch in the requested feature with the " "available one\r\n",
-                rslt);
-            break;
+	case BMI2_E_INVALID_SENSOR:
+		PDEBUG(
+				"Error [%d] : Invalid sensor error. It occurs when there is a mismatch in the requested feature with the " "available one\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_SELF_TEST_FAIL:
-            PDEBUG(
-                "Error [%d] : Self-test failed error. It occurs when the validation of accel self-test data is " "not satisfied\r\n",
-                rslt);
-            break;
+	case BMI2_E_SELF_TEST_FAIL:
+		PDEBUG(
+				"Error [%d] : Self-test failed error. It occurs when the validation of accel self-test data is " "not satisfied\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_INVALID_INT_PIN:
-            PDEBUG(
-                "Error [%d] : Invalid interrupt pin error. It occurs when the user tries to configure interrupt pins " "apart from INT1 and INT2\r\n",
-                rslt);
-            break;
+	case BMI2_E_INVALID_INT_PIN:
+		PDEBUG(
+				"Error [%d] : Invalid interrupt pin error. It occurs when the user tries to configure interrupt pins " "apart from INT1 and INT2\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_OUT_OF_RANGE:
-            PDEBUG(
-                "Error [%d] : Out of range error. It occurs when the data exceeds from filtered or unfiltered data from " "fifo and also when the range exceeds the maximum range for accel and gyro while performing FOC\r\n",
-                rslt);
-            break;
+	case BMI2_E_OUT_OF_RANGE:
+		PDEBUG(
+				"Error [%d] : Out of range error. It occurs when the data exceeds from filtered or unfiltered data from " "fifo and also when the range exceeds the maximum range for accel and gyro while performing FOC\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_ACC_INVALID_CFG:
-            PDEBUG(
-                "Error [%d] : Invalid Accel configuration error. It occurs when there is an error in accel configuration" " register which could be one among range, BW or filter performance in reg address 0x40\r\n",
-                rslt);
-            break;
+	case BMI2_E_ACC_INVALID_CFG:
+		PDEBUG(
+				"Error [%d] : Invalid Accel configuration error. It occurs when there is an error in accel configuration" " register which could be one among range, BW or filter performance in reg address 0x40\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_GYRO_INVALID_CFG:
-            PDEBUG(
-                "Error [%d] : Invalid Gyro configuration error. It occurs when there is a error in gyro configuration" "register which could be one among range, BW or filter performance in reg address 0x42\r\n",
-                rslt);
-            break;
+	case BMI2_E_GYRO_INVALID_CFG:
+		PDEBUG(
+				"Error [%d] : Invalid Gyro configuration error. It occurs when there is a error in gyro configuration" "register which could be one among range, BW or filter performance in reg address 0x42\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_ACC_GYR_INVALID_CFG:
-            PDEBUG(
-                "Error [%d] : Invalid Accel-Gyro configuration error. It occurs when there is a error in accel and gyro" " configuration registers which could be one among range, BW or filter performance in reg address 0x40 " "and 0x42\r\n",
-                rslt);
-            break;
+	case BMI2_E_ACC_GYR_INVALID_CFG:
+		PDEBUG(
+				"Error [%d] : Invalid Accel-Gyro configuration error. It occurs when there is a error in accel and gyro" " configuration registers which could be one among range, BW or filter performance in reg address 0x40 " "and 0x42\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_CONFIG_LOAD:
-            PDEBUG(
-                "Error [%d] : Configuration load error. It occurs when failure observed while loading the configuration " "into the sensor\r\n",
-                rslt);
-            break;
+	case BMI2_E_CONFIG_LOAD:
+		PDEBUG(
+				"Error [%d] : Configuration load error. It occurs when failure observed while loading the configuration " "into the sensor\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_INVALID_PAGE:
-            PDEBUG(
-                "Error [%d] : Invalid page error. It occurs due to failure in writing the correct feature configuration " "from selected page\r\n",
-                rslt);
-            break;
+	case BMI2_E_INVALID_PAGE:
+		PDEBUG(
+				"Error [%d] : Invalid page error. It occurs due to failure in writing the correct feature configuration " "from selected page\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_SET_APS_FAIL:
-            PDEBUG(
-                "Error [%d] : APS failure error. It occurs due to failure in write of advance power mode configuration " "register\r\n",
-                rslt);
-            break;
+	case BMI2_E_SET_APS_FAIL:
+		PDEBUG(
+				"Error [%d] : APS failure error. It occurs due to failure in write of advance power mode configuration " "register\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_AUX_INVALID_CFG:
-            PDEBUG(
-                "Error [%d] : Invalid AUX configuration error. It occurs when the auxiliary interface settings are not " "enabled properly\r\n",
-                rslt);
-            break;
+	case BMI2_E_AUX_INVALID_CFG:
+		PDEBUG(
+				"Error [%d] : Invalid AUX configuration error. It occurs when the auxiliary interface settings are not " "enabled properly\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_AUX_BUSY:
-            PDEBUG(
-                "Error [%d] : AUX busy error. It occurs when the auxiliary interface buses are engaged while configuring" " the AUX\r\n",
-                rslt);
-            break;
+	case BMI2_E_AUX_BUSY:
+		PDEBUG(
+				"Error [%d] : AUX busy error. It occurs when the auxiliary interface buses are engaged while configuring" " the AUX\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_REMAP_ERROR:
-            PDEBUG(
-                "Error [%d] : Remap error. It occurs due to failure in assigning the remap axes data for all the axes " "after change in axis position\r\n",
-                rslt);
-            break;
+	case BMI2_E_REMAP_ERROR:
+		PDEBUG(
+				"Error [%d] : Remap error. It occurs due to failure in assigning the remap axes data for all the axes " "after change in axis position\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_GYR_USER_GAIN_UPD_FAIL:
-            PDEBUG(
-                "Error [%d] : Gyro user gain update fail error. It occurs when the reading of user gain update status " "fails\r\n",
-                rslt);
-            break;
+	case BMI2_E_GYR_USER_GAIN_UPD_FAIL:
+		PDEBUG(
+				"Error [%d] : Gyro user gain update fail error. It occurs when the reading of user gain update status " "fails\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_SELF_TEST_NOT_DONE:
-            PDEBUG(
-                "Error [%d] : Self-test not done error. It occurs when the self-test process is ongoing or not " "completed\r\n",
-                rslt);
-            break;
+	case BMI2_E_SELF_TEST_NOT_DONE:
+		PDEBUG(
+				"Error [%d] : Self-test not done error. It occurs when the self-test process is ongoing or not " "completed\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_INVALID_INPUT:
-            PDEBUG("Error [%d] : Invalid input error. It occurs when the sensor input validity fails\r\n", rslt);
-            break;
+	case BMI2_E_INVALID_INPUT:
+		PDEBUG(
+				"Error [%d] : Invalid input error. It occurs when the sensor input validity fails\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_INVALID_STATUS:
-            PDEBUG("Error [%d] : Invalid status error. It occurs when the feature/sensor validity fails\r\n", rslt);
-            break;
+	case BMI2_E_INVALID_STATUS:
+		PDEBUG(
+				"Error [%d] : Invalid status error. It occurs when the feature/sensor validity fails\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_CRT_ERROR:
-            PDEBUG("Error [%d] : CRT error. It occurs when the CRT test has failed\r\n", rslt);
-            break;
+	case BMI2_E_CRT_ERROR:
+		PDEBUG(
+				"Error [%d] : CRT error. It occurs when the CRT test has failed\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_ST_ALREADY_RUNNING:
-            PDEBUG(
-                "Error [%d] : Self-test already running error. It occurs when the self-test is already running and " "another has been initiated\r\n",
-                rslt);
-            break;
+	case BMI2_E_ST_ALREADY_RUNNING:
+		PDEBUG(
+				"Error [%d] : Self-test already running error. It occurs when the self-test is already running and " "another has been initiated\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_CRT_READY_FOR_DL_FAIL_ABORT:
-            PDEBUG(
-                "Error [%d] : CRT ready for download fail abort error. It occurs when download in CRT fails due to wrong " "address location\r\n",
-                rslt);
-            break;
+	case BMI2_E_CRT_READY_FOR_DL_FAIL_ABORT:
+		PDEBUG(
+				"Error [%d] : CRT ready for download fail abort error. It occurs when download in CRT fails due to wrong " "address location\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_DL_ERROR:
-            printf(
-                "Error [%d] : Download error. It occurs when write length exceeds that of the maximum burst length\r\n",
-                rslt);
-            break;
+	case BMI2_E_DL_ERROR:
+		printf(
+				"Error [%d] : Download error. It occurs when write length exceeds that of the maximum burst length\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_PRECON_ERROR:
-            PDEBUG(
-                "Error [%d] : Pre-conditional error. It occurs when precondition to start the feature was not " "completed\r\n",
-                rslt);
-            break;
+	case BMI2_E_PRECON_ERROR:
+		PDEBUG(
+				"Error [%d] : Pre-conditional error. It occurs when precondition to start the feature was not " "completed\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_ABORT_ERROR:
-            PDEBUG("Error [%d] : Abort error. It occurs when the device was shaken during CRT test\r\n", rslt);
-            break;
+	case BMI2_E_ABORT_ERROR:
+		PDEBUG(
+				"Error [%d] : Abort error. It occurs when the device was shaken during CRT test\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_WRITE_CYCLE_ONGOING:
-            PDEBUG(
-                "Error [%d] : Write cycle ongoing error. It occurs when the write cycle is already running and another " "has been initiated\r\n",
-                rslt);
-            break;
+	case BMI2_E_WRITE_CYCLE_ONGOING:
+		PDEBUG(
+				"Error [%d] : Write cycle ongoing error. It occurs when the write cycle is already running and another " "has been initiated\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_ST_NOT_RUNING:
-            PDEBUG(
-                "Error [%d] : Self-test is not running error. It occurs when self-test running is disabled while it's " "running\r\n",
-                rslt);
-            break;
+	case BMI2_E_ST_NOT_RUNING:
+		PDEBUG(
+				"Error [%d] : Self-test is not running error. It occurs when self-test running is disabled while it's " "running\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_DATA_RDY_INT_FAILED:
-            PDEBUG(
-                "Error [%d] : Data ready interrupt error. It occurs when the sample count exceeds the FOC sample limit " "and data ready status is not updated\r\n",
-                rslt);
-            break;
+	case BMI2_E_DATA_RDY_INT_FAILED:
+		PDEBUG(
+				"Error [%d] : Data ready interrupt error. It occurs when the sample count exceeds the FOC sample limit " "and data ready status is not updated\r\n",
+				rslt);
+		break;
 
-        case BMI2_E_INVALID_FOC_POSITION:
-            PDEBUG(
-                "Error [%d] : Invalid FOC position error. It occurs when average FOC data is obtained for the wrong" " axes\r\n",
-                rslt);
-            break;
+	case BMI2_E_INVALID_FOC_POSITION:
+		PDEBUG(
+				"Error [%d] : Invalid FOC position error. It occurs when average FOC data is obtained for the wrong" " axes\r\n",
+				rslt);
+		break;
 
-        default:
-            PDEBUG("Error [%d] : Unknown error code\r\n", rslt);
-            break;
-    }
+	default:
+		PDEBUG("Error [%d] : Unknown error code\r\n", rslt);
+		break;
+	}
 }
 
 /*!
  *  @brief Function to select the interface between SPI and I2C.
  *  Also to initialize coines platform
  */
-int8_t bmi2_interface_init(struct bmi2_dev *bmi, uint8_t intf)
-{
+int8_t bmi2_interface_init(struct bmi2_dev *bmi, uint8_t intf) {
 	int8_t rslt = BMI2_OK;
 
 	/* Bus configuration : I2C */
-	if (intf == BMI2_I2C_INTF)
-	{
+	if (intf == BMI2_I2C_INTF) {
 		PDEBUG("I2C Interface \n");
 
 		/* To initialize the user I2C function */
 		bmi270_dev_addr = BMI2_I2C_PRIM_ADDR;
 		bmi->intf = BMI2_I2C_INTF;
-		bmi->read = (bmi2_read_fptr_t)SensorAPI_I2Cx_Read;
-		bmi->write = (bmi2_write_fptr_t)SensorAPI_I2Cx_Write;
+		bmi->read = (bmi2_read_fptr_t) SensorAPI_I2Cx_Read;
+		bmi->write = (bmi2_write_fptr_t) SensorAPI_I2Cx_Write;
 	}
-
 
 	/* Assign device address to interface pointer */
 	bmi->intf_ptr = &bmi270_dev_addr;
@@ -296,55 +303,117 @@ int8_t bmi2_interface_init(struct bmi2_dev *bmi, uint8_t intf)
 	/* Assign to NULL to load the default config file. */
 	bmi->config_file_ptr = NULL;
 
+
+
 	return rslt;
 }
 
-int8_t bmi2_step_counter_set_config(struct bmi2_dev *bmi2_dev)
+int8_t Init_BMI270(struct bmi2_dev *dev) {
+	int8_t rslt = BMI2_OK;
+	uint8_t chipid;
+	uint8_t ver_major, ver_minor;
+
+	/* Interface reference is given as a parameter
+	 * For I2C : BMI2_I2C_INTF
+	 * For SPI : BMI2_SPI_INTF
+	 */
+	rslt = bmi2_interface_init(dev, BMI2_I2C_INTF);
+	bmi2_error_codes_print_result(rslt);
+
+	/* Initialize bmi270. */
+	rslt = bmi270_init(dev);
+	bmi2_error_codes_print_result(rslt);
+
+	if (rslt != BMI2_OK) {
+		PDEBUG("bmi270_wh_init() failed, error code: %d\r\n", rslt);
+		return rslt;
+	} else {
+		rslt = bmi2_get_regs(BMI2_CHIP_ID_ADDR, &chipid, 1, dev);
+		if (rslt != BMI2_OK) {
+			PDEBUG("read chip ID failed, error code: %d\r\n", rslt);
+			return rslt;
+		}
+
+		PDEBUG("Chip ID:%02x\r\n", chipid);
+	}
+
+	PDEBUG("BMI270 initialized successfully\r\n");
+
+	rslt = bmi2_get_config_file_version(&ver_major, &ver_minor, dev);
+	PDEBUG("The firmware version: v%d.%d\r\n", ver_major, ver_minor);
+
+	/*Axis mapping according phisical structure*/
+
+	return rslt;
+}
+int8_t bmi2_step_counter_set_config(struct bmi2_dev *bmi2_dev) {
+	/* Variable to define result */
+	int8_t rslt;
+
+	/* Initialize interrupts for gyroscope */
+	struct bmi2_sens_int_config sens_int = { .type = BMI2_STEP_COUNTER,
+			.hw_int_pin = BMI2_INT2 };
+
+	/* List the sensors which are required to enable */
+	uint8_t sens_list[2] = { BMI2_ACCEL, BMI2_STEP_COUNTER };
+
+	/* Structure to define the type of the sensor and its configurations */
+	struct bmi2_sens_config config;
+
+	/* Configure type of feature */
+	config.type = BMI2_STEP_COUNTER;
+
+	/* Enable the selected sensors */
+	rslt = bmi2_sensor_enable(sens_list, 2, bmi2_dev);
+
+	if (rslt == BMI2_OK) {
+		/* Get default configurations for the type of feature selected */
+		rslt = bmi2_get_sensor_config(&config, 1, bmi2_dev);
+
+		if (rslt == BMI2_OK) {
+			config.cfg.step_counter.watermark_level = 1;
+
+			rslt = bmi2_set_sensor_config(&config, 1, bmi2_dev);
+			if (rslt == BMI2_OK) {
+				/* Map interrupt to pins */
+				rslt = bmi270_map_feat_int(&sens_int, 1, bmi2_dev);
+			} else {
+				printf("Set Sensor Config failed");
+			}
+
+		} else {
+			printf("Get sensor config failed");
+		}
+	} else {
+		printf("Sensor Enable Failed");
+	}
+
+	return rslt;
+}
+
+int8_t SensorAPI_I2Cx_Read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
 {
-  /* Variable to define result */
-  int8_t rslt;
+	uint8_t dev_addr = *(uint8_t*)intf_ptr;
+	uint16_t DevAddress = dev_addr << 1;
 
-  /* Initialize interrupts for gyroscope */
-  struct bmi2_sens_int_config sens_int = { .type = BMI2_STEP_COUNTER, .hw_int_pin = BMI2_INT2 };
+	// send register address
+	HAL_I2C_Master_Transmit(&I2C_HANDLE, DevAddress, &reg_addr, 1, BUS_TIMEOUT);
+	HAL_I2C_Master_Receive(&I2C_HANDLE, DevAddress, reg_data, len, BUS_TIMEOUT);
+	return 0;
+}
 
-  /* List the sensors which are required to enable */
-  uint8_t sens_list[2] = {BMI2_ACCEL, BMI2_STEP_COUNTER};
+int8_t SensorAPI_I2Cx_Write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr)
+{
+	uint8_t dev_addr = *(uint8_t*)intf_ptr;
+	uint16_t DevAddress = dev_addr << 1;
 
-  /* Structure to define the type of the sensor and its configurations */
-  struct bmi2_sens_config config;
+	uint8_t buf[len + 1];
+	buf[0] = reg_addr;
+	memcpy(&buf[1], reg_data, len);
 
-  /* Configure type of feature */
-  config.type = BMI2_STEP_COUNTER;
-
-  /* Enable the selected sensors */
-  rslt = bmi2_sensor_enable(sens_list, 2, bmi2_dev);
-
-  if (rslt == BMI2_OK)
-  {
-    /* Get default configurations for the type of feature selected */
-    rslt = bmi2_get_sensor_config(&config, 1, bmi2_dev);
-
-    if (rslt == BMI2_OK)
-    {
-      config.cfg.step_counter.watermark_level = 1;
-
-      rslt = bmi2_set_sensor_config(&config, 1, bmi2_dev);
-      if (rslt == BMI2_OK) {
-        /* Map interrupt to pins */
-    	  rslt = bmi270_map_feat_int(&sens_int, 1, bmi2_dev);
-      } else {
-        printf("Set Sensor Config failed");
-      }
-
-
-    } else {
-      printf("Get sensor config failed");
-    }
-  } else {
-    printf("Sensor Enable Failed");
-  }
-
-  return rslt;
+	// send register address
+	HAL_I2C_Master_Transmit(&I2C_HANDLE, DevAddress, buf, len+1, BUS_TIMEOUT);
+	return 0;
 }
 
 /* USER CODE END 0 */
@@ -380,6 +449,36 @@ int main(void)
   MX_USART1_UART_Init();
   MX_I2C1_Init();
   /* USER CODE BEGIN 2 */
+	int8_t rslt = BMI2_OK;
+
+	/* Interface reference is given as a parameter
+	 * For I2C : BMI2_I2C_INTF
+	 * For SPI : BMI2_SPI_INTF
+	 */
+	struct bmi2_dev *dev;
+	dev = &bmi270dev;
+
+	bmi270_dev_addr = BMI2_I2C_PRIM_ADDR;
+	dev->intf = BMI2_I2C_INTF;
+	dev->read = (bmi2_read_fptr_t)SensorAPI_I2Cx_Read;
+	dev->write = (bmi2_write_fptr_t)SensorAPI_I2Cx_Write;
+
+	/* Assign device address to interface pointer */
+	dev->intf_ptr = &bmi270_dev_addr;
+
+	/* Configure delay in microseconds */
+	dev->delay_us = bmi2_delay_us;
+
+	/* Configure max read/write length (in bytes) ( Supported length depends on target machine) */
+	dev->read_write_len = READ_WRITE_LEN;
+
+	/* Assign to NULL to load the default config file. */
+	dev->config_file_ptr = NULL;
+
+
+	/* Initialize bmi270. */
+	rslt = bmi270_init(dev);
+	bmi2_error_codes_print_result(rslt);
 
 
   /* USER CODE END 2 */

@@ -7,7 +7,7 @@
 
 #define I2C_HANDLE	(hi2c1)
 #define SPI_HANDLE	(hspi1)
-#define UART_HANDLE	(huart2)
+#define UART_HANDLE	(huart1)
 
 #define BUS_TIMEOUT             1000
 
@@ -24,8 +24,8 @@ void PDEBUG(char *format, ...);
 
 
 #if defined(USE_BOSCH_SENSOR_API)
-int8_t SensorAPI_I2Cx_Read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr);
-int8_t SensorAPI_I2Cx_Write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr);
+//int8_t SensorAPI_I2Cx_Read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr);
+//int8_t SensorAPI_I2Cx_Write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr);
 int8_t SensorAPI_SPIx_Read(uint8_t subaddress, uint8_t *pBuffer, uint16_t ReadNumbr, void *intf_ptr);
 int8_t SensorAPI_SPIx_Write(uint8_t subaddress, uint8_t *pBuffer, uint16_t WriteNumbr, void *intf_ptr);
 

@@ -8,11 +8,10 @@
 #include "common_porting.h"
 #include "main.h"
 
-extern UART_HandleTypeDef huart2;
+extern UART_HandleTypeDef huart1;
 extern I2C_HandleTypeDef hi2c1;
 
 
-uint8_t GTXBuffer[512], GRXBuffer[2048];
 
 volatile uint8_t int1_flag = 0;
 volatile uint8_t int2_flag = 0;
@@ -62,29 +61,7 @@ void PDEBUG(char *format, ...)
 }
 
 #if defined(USE_BOSCH_SENSOR_API)
-int8_t SensorAPI_I2Cx_Read(uint8_t reg_addr, uint8_t *reg_data, uint32_t len, void *intf_ptr)
-{
-	uint8_t dev_addr = *(uint8_t*)intf_ptr;
-	uint16_t DevAddress = dev_addr << 1;
 
-	// send register address
-	HAL_I2C_Master_Transmit(&I2C_HANDLE, DevAddress, &reg_addr, 1, BUS_TIMEOUT);
-	HAL_I2C_Master_Receive(&I2C_HANDLE, DevAddress, reg_data, len, BUS_TIMEOUT);
-	return 0;
-}
-
-int8_t SensorAPI_I2Cx_Write(uint8_t reg_addr, const uint8_t *reg_data, uint32_t len, void *intf_ptr)
-{
-	uint8_t dev_addr = *(uint8_t*)intf_ptr;
-	uint16_t DevAddress = dev_addr << 1;
-
-	GTXBuffer[0] = reg_addr;
-	memcpy(&GTXBuffer[1], reg_data, len);
-
-	// send register address
-	HAL_I2C_Master_Transmit(&I2C_HANDLE, DevAddress, GTXBuffer, len+1, BUS_TIMEOUT);
-	return 0;
-}
 
 
 #endif
